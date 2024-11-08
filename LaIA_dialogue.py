@@ -13,19 +13,28 @@ client = OpenAI(
        base_url=BASE_URL + "/v1/",
        api_key=HF_TOKEN
    )
-messages = [{ "role": "system", "content": """"Ets un assistent en català que crea una conversa entre dues persones, el **Cai** i la **LaIA**, sobre diversos tràmits administratius com beques, ajuts, permisos i altres serveis públics. En aquest diàleg, el **Cai** fa una pregunta inicial general sobre el tràmit en qüestió i després únicament afegeix alguna pregunta breu per a aclarir algun detall que no ha sigut respós per la LaIA. La **LaIA** és l’encarregada de proporcionar respostes completes i detallades que cobreixin tots els aspectes importants del tràmit, incloent informació addicional i anticipant possibles dubtes del **Cai**, les seves respostes han de ser molt llargues i extenses, sobretot a la primera pregunta del CAI ja que és la principal.
+messages = [{ "role": "system", "content": """"Ets un assistent en català que crea un diàleg entre dues persones, el Cai i la LaIA, sobre diversos tràmits administratius com beques, ajuts, permisos i altres serveis públics. En aquest diàleg, el Cai fa una pregunta inicial general sobre el tràmit i només afegeix alguna intervenció molt breu per mantenir la conversa natural, sense entrar en detalls. La LaIA és qui proporciona respostes completes, cobertes de tots els aspectes importants, incloent-hi informació addicional i anticipant qualsevol dubte que el Cai pugui tenir.
 
-**Directrius per a la conversa**:
-1. **Cai**: Comença amb una pregunta general sobre el tràmit. La major part de la informació la proporciona la **LaIA**.
-2. **LaIA**: Respon amb explicacions llargues i completes que cobreixin la majoria dels dubtes possibles en una sola resposta. Ha d'incloure informació sobre el funcionament general, requisits, terminis, documents necessaris, incompatibilitats i qualsevol altra dada rellevant sense esperar que el **Cai** pregunti cada detall.
-3. **To de la conversa**: La **LaIA** ha de mantenir un to amable, proper i informatiu, fent servir transicions per connectar diferents temes i oferint una resposta coherent i fàcil de seguir. La seva resposta ha d’anticipar possibles preguntes del **Cai** i evitar que aquest hagi de preguntar constantment, ha de donar una resposta molt natural i fluïda, entenedora per joves.
-4. **Estructura de resposta**: La **LaIA** ha de donar respostes extenses i completes que cobreixin múltiples aspectes del tràmit. Sense repetir informació.
-5. **Evitar repeticions innecessàries**: La **LaIA** ha de procurar que les seves respostes siguin completes des del principi per reduir la necessitat de preguntes addicionals. Si el **Cai** fa una pregunta redundant, la **LaIA** ha de respondre de manera concisa o referir-se a la informació prèviament donada.
-6. **Finalització natural**: La **LaIA** ha de concloure amb una invitació per fer altres preguntes si el **Cai** en té, o amb una frase de tancament amable. El diàleg ha de semblar resolutiu i satisfactori per al **Cai**.
+Directrius per a la conversa:
 
-**Objectiu**:
-Generar una conversa interactiva on el **Cai** només fa una pregunta inicial, mentre que la **LaIA** cobreix la major part de la informació en respostes molt detallades, fent que el diàleg sembli natural i informatiu sense que el **Cai** hagi de preguntar cada detall individualment.
+Què fa el personatge Cai: Comença amb una pregunta general sobre el tràmit i fa molt poques intervencions breus després, només per mantenir la conversa fluida. Evita fer preguntes detallades o segmentades; el seu paper és principalment reactiu.
+
+Què fa el personatge LaIA: Respon amb explicacions llargues, completes i naturals, cobrint tots els aspectes possibles del tràmit en una sola resposta extensa. Ha de proporcionar informació sobre el funcionament, requisits, terminis, documents necessaris, possibles incompatibilitats i consells, de manera que el Cai no hagi de preguntar més detalls. La LaIA s’assegura d'anticipar qualsevol dubte que podria sorgir.
+
+Com ha de ser el to de la conversa: La LaIA ha de sonar propera, informativa i accessible. La seva resposta ha d’incloure detalls i transicions suaus entre temes, oferint una explicació fàcil de seguir i completa, com si parlés amb algú en una conversa natural. La LaIA i el Cai han de mantenir un to amable i les seves interaccions han d'estar connectades de manera coherent.
+
+Com és l'estructura de resposta: La LaIA cobreix tots els temes rellevants en una resposta completa, fent que el Cai no senti la necessitat de fer preguntes addicionals. Si el Cai fa una intervenció breu de seguiment, la LaIA pot respondre de manera concisa o fer una referència breu a la informació donada.
+
+Quanta informació ha d'incloure cada resposta: La LaIA ha de donar respostes inicials molt completes per minimitzar la necessitat de preguntes de seguiment. Si el Cai fa una pregunta redundant, la LaIA ha de mantenir la resposta breu i referir-se a la informació prèvia.
+
+Com ha de finalitzar el diàleg: La LaIA ha de tancar amb una frase amable, indicant que pot ajudar en cas de dubtes, però deixant clar que ja ha proporcionat tota la informació necessària perquè el Cai se senti ben informat.
+
+Quin és l'objectiu final: Generar una conversa on el Cai només fa una pregunta inicial general i, com a màxim, alguna intervenció molt breu i reactiva. La LaIA cobreix tota la informació en una resposta detallada i anticipativa, fent que el diàleg sembli natural, complet i informatiu sense necessitat de més preguntes per part del Cai.
+             
+S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informació possible i encara més detalls extres així que el Cai només ha de preguntar com a molt 3 vegades qüestions molt específiques. S'ha de complir que les preguntes del Cai comencin de maneres diferents per evitar repeticions quan el Cai parla ha de donar gràcies a la Laia o dir-li d'acord d'alguna manera. Quan la Laia parla, si Cai li ha fet una molt bona pregunta cal que li comenti que és molt important el que ha dit fent molt més natural la interacció.
 """}]
+
+messages.append( {"role":"user", "content": """A contiuació tens la informació del tràmit per tal de poder crear el diàleg: """})
 messages.append( {"role":"user", "content": """IMPORTANT:
 
 Tots els tràmits d'aquesta convocatòria es faran exclusivament per internet.
@@ -77,7 +86,7 @@ chat_completion = client.chat.completions.create(
    max_tokens=1000,
    temperature=0.1,
    top_p=0.95,
-   frequency_penalty=0.2,
+   frequency_penalty=0.05,
 )
 text = ""
 if stream:
