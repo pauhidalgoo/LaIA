@@ -17,7 +17,7 @@ messages = [{ "role": "system", "content": """"Ets un assistent en català que c
 
 Directrius per a la conversa:
 
-Què fa el personatge Cai: Comença amb una pregunta general sobre el tràmit i fa molt poques intervencions breus després, només per mantenir la conversa fluida. Evita fer preguntes detallades o segmentades; el seu paper és principalment reactiu.
+Què fa el personatge Cai: Comença amb una pregunta general sobre el tràmit en concret i fa molt poques intervencions breus després, només per mantenir la conversa fluida. Evita fer preguntes detallades o segmentades; el seu paper és principalment reactiu.
 
 Què fa el personatge LaIA: Respon amb explicacions llargues, completes i naturals, cobrint tots els aspectes possibles del tràmit en una sola resposta extensa. Ha de proporcionar informació sobre el funcionament, requisits, terminis, documents necessaris, possibles incompatibilitats i consells, de manera que el Cai no hagi de preguntar més detalls. La LaIA s’assegura d'anticipar qualsevol dubte que podria sorgir.
 
