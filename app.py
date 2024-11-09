@@ -105,6 +105,40 @@ def home():
 
     return render_template('index.html', session_id=session_id)
 
+@app.route('/transcribe', methods=['POST'])
+def transcribe_audio():
+    if 'audio' not in request.files:
+        return jsonify({'error': 'No audio file provided'}), 400
+        
+    audio_file = request.files['audio']
+    session_id = request.form.get('session_id')
+    
+    if not session_id or session_id not in chat_sessions:
+        return jsonify({'error': 'Invalid session'}), 400
+    
+    try:
+        # Create a temporary file to save the audio
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            audio_file.save(tmp_file.name)
+            
+            # Start recording and get transcription
+            transcription = stt_service.start_recording(tmp_file.name)
+            
+            # Clean up the temporary file
+            os.unlink(tmp_file.name)
+            
+            return jsonify({
+                'transcription': transcription,
+                'success': True
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     print(f"Incoming request data: {request.get_json()}")
