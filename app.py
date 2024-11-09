@@ -19,12 +19,15 @@ from web_search_agent import WebSearchAgent
 import io
 from document_Manager import DocumentManager
 from select_best_sources import SelectBestSources
-
+from LaIA_dialogue import LaIA_dialogue
+from LaIA_video import LaIA_video
+import re
 load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads/'
 app.config['AUDIO_FOLDER'] = 'static/audio/'
+app.config['VIDEO_FOLDER'] = 'static/video/'
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB limit
 
 # Ensure upload directories exist
@@ -34,7 +37,7 @@ os.makedirs(app.config['AUDIO_FOLDER'], exist_ok=True)
 # Initialize components
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=4000,
+    chunk_size=1000,
     chunk_overlap=200,
     length_function=len,
 )
@@ -95,6 +98,14 @@ def process_image(file):
     image = Image.open(file)
     text = pytesseract.image_to_string(image)
     return "Image text: " + text
+
+def detect_video_request(text):
+    # Regular expression to detect keywords related to video or audio content
+    text = text.lower()
+    pattern = r'\b(vídeo|video|tiktok|reels|podcast)\b'
+    
+    # Search for the pattern in the text, case insensitive
+    return bool(re.search(pattern, text, re.IGNORECASE))
 
 @app.route('/')
 def home():
@@ -161,6 +172,56 @@ def chat():
         # Placeholder/Loading message
         processing_message = session.add_message('assistant', "Thinking...")
         update_chat_async(session_id, session.messages) 
+
+
+        if detect_video_request(message):
+            ubi = app.config['VIDEO_FOLDER'] + "final_video_with_subtitles.mp4"
+            socketio.emit('video_generation_start', {
+            }, room=session_id)
+
+
+            
+            text = session.document_manager.get_context(query=message, llm_client=agent.client)
+            print(text)
+            socketio.emit('video_progress', {
+                'progress': 20,
+                'status': 'Generating dialogue...'
+            }, room=session_id)
+
+            print("aaa")
+            
+            dialog = LaIA_dialogue(text)
+            dialog.create_dialogue()
+            
+            socketio.emit('video_progress', {
+                'progress': 40,
+                'status': 'Creating video scenes...'
+            }, room=session_id)
+
+            print(dialog.dialogue)
+            
+            video = LaIA_video(dialog.dialogue, final_video_ubi=ubi)
+            
+            socketio.emit('video_progress', {
+                'progress': 80,
+                'status': 'Adding subtitles...'
+            }, room=session_id)
+            
+            # ... video processing ...
+            
+            socketio.emit('video_progress', {
+                'progress': 100,
+                'status': 'Finalizing video...'
+            }, room=session_id)
+            
+            socketio.emit('video_generation_complete', room=session_id)
+            
+            processing_message['content'] = "Aquí tens el teu video."
+            processing_message['citations'] = []
+            processing_message['audio_file'] = None
+            processing_message['video_file'] = ubi
+            return jsonify({'history': session.messages})
+
     
         # Generate response based on context
         if len(session.document_manager.documents) != 0:
@@ -197,7 +258,6 @@ def chat():
                     )
                 output = session.document_manager.generate_response(
                     query=message,
-                    max_tokens=1000,
                     llm_client=agent.client,
                     include_citations=True
                 )
@@ -227,7 +287,6 @@ def chat():
                 )
             output = session.document_manager.generate_response(
                 query=message,
-                max_tokens=1000,
                 llm_client=agent.client,
                 include_citations=True
             )
@@ -245,6 +304,7 @@ def chat():
         processing_message['content'] = response
         processing_message['citations'] = citations
         processing_message['audio_file'] = audio_filename if tts_success else None
+        processing_message['video_file'] = None
         return jsonify({'history': session.messages})
     
     elif message_type == 'audio':

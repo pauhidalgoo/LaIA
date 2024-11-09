@@ -14,11 +14,12 @@ import random
 
 
 class LaIA_video:
-    def __init__(self, dialogue_text='', dialect='central', voices = {'man':'grau', 'woman':'elia'}):
+    def __init__(self, dialogue_text='', dialect='central', voices = {'man':'grau', 'woman':'elia'}, final_video_ubi = "final_video_with_subtitles.mp4"):
         assert dialogue_text, "Text is required"
         assert dialect in ["central", "nord-occidental", "balear", "valencia"], "Invalid dialect"
 
         self.dialogue_text = dialogue_text
+        self.final_video_ubi = final_video_ubi
         self.dialect = dialect
         self.voices = voices
 
@@ -206,7 +207,7 @@ class LaIA_video:
     def create_video(self):
         image_folder = "generated_images"
         audio_file = "final_conversation.wav"
-        output_video = "final_video_with_subtitles.mp4"
+        output_video = self.final_video_ubi
         image_duration = 10
 
         audio = AudioFileClip(audio_file)
