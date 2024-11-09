@@ -69,6 +69,20 @@ class WebSearchAgent:
         except Exception as e:
             logger.error(f"Error in search_and_analyze: {str(e)}")
             return f"An error occurred while processing your query: {str(e)}"
+        
+    def simple_web(self, url: str):
+        try:
+            response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract main content
+            main_content = self._extract_main_content(soup)
+            print(main_content)
+
+            
+            return main_content
+        except:
+            print("error")
 
     def _explore_url(self, url: str, depth: int) -> Optional[Dict]:
         """
