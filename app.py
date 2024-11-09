@@ -426,7 +426,8 @@ def push_url():
 
 @app.route('/documents/<doc_id>', methods=['DELETE'])
 def remove_document(doc_id):
-    session_id = request.form.get('session_id')
+    data = request.get_json()
+    session_id = data.get('session_id') if data else None
     if session_id and session_id in chat_sessions:
         session = chat_sessions[session_id]
         success = session.document_manager.remove_document(doc_id)
@@ -434,7 +435,8 @@ def remove_document(doc_id):
             'success': success,
             'documents': session.document_manager.get_document_list()
         })
-    return jsonify({'error': 'Invalid file type'}), 400
+    return jsonify({'error': 'Invalid session'}), 400
+
 
 from flask_socketio import SocketIO, join_room, leave_room
 

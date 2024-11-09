@@ -45,45 +45,50 @@ class DocumentManager:
         )
         
         self.documents[doc_id] = document
-        if self.vector_store != None:
-            all_chunks = []
-            metadatas = []
-            for i, chunk in enumerate(document.chunks):
-                all_chunks.append(chunk)
-                metadatas.append({
-                    'doc_id': document.id,
-                    'doc_title': document.title,
-                    'doc_type': document.type,
-                    'chunk_index': i,
-                    'source_url': document.source_url
-                })
-            self.vector_store.add_texts(all_chunks, metadatas=metadatas)
+
+        all_chunks = []
+        metadatas = []
+        ids = []
+        for i, chunk in enumerate(document.chunks):
+            all_chunks.append(chunk)
+            metadatas.append({
+                'doc_id': document.id,
+                'doc_title': document.title,
+                'doc_type': document.type,
+                'chunk_index': i,
+                'source_url': document.source_url
+            })
+            ids.append(f"{document.id}_{i}")  # Assign unique IDs to chunks
+
+        if self.vector_store is not None:
+            self.vector_store.add_texts(all_chunks, metadatas=metadatas, ids=ids)
         else:
-            all_chunks = []
-            metadatas = []
-            for i, chunk in enumerate(document.chunks):
-                all_chunks.append(chunk)
-                metadatas.append({
-                    'doc_id': document.id,
-                    'doc_title': document.title,
-                    'doc_type': document.type,
-                    'chunk_index': i,
-                    'source_url': document.source_url
-                })
-            self.vector_store = FAISS.from_texts(all_chunks, self.embeddings, metadatas=metadatas)
+            self.vector_store = FAISS.from_texts(all_chunks, self.embeddings, metadatas=metadatas, ids=ids)
 
         self.vector_store.save_local("faiss_index")
         return document, len(chunks)
+
     
 
     
     def remove_document(self, doc_id: str) -> bool:
         """Remove a document and update vector store"""
         if doc_id in self.documents:
+            # Remove document from documents
             del self.documents[doc_id]
-            self.vector_store.delete(doc_id)
+
+            # Collect IDs of chunks to delete
+            ids_to_delete = [
+                vector_id for vector_id, doc in self.vector_store.docstore._dict.items()
+                if doc.metadata.get('doc_id') == doc_id
+            ]
+
+            if ids_to_delete:
+                self.vector_store.delete(ids_to_delete)
+
             return True
         return False
+
    
     
     def search(self, query: str, k: int = 3, relevance_threshold: float = 1.5, llm_client = None) -> List[Dict]:
