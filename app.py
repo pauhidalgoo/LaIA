@@ -37,7 +37,7 @@ os.makedirs(app.config['AUDIO_FOLDER'], exist_ok=True)
 # Initialize components
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
+    chunk_size=7000,
     chunk_overlap=200,
     length_function=len,
 )
@@ -191,16 +191,16 @@ def chat():
             print("aaa")
             
             dialog = LaIA_dialogue(text)
-            dialog.create_dialogue()
+            text = dialog.create_dialogue()
             
             socketio.emit('video_progress', {
                 'progress': 40,
                 'status': 'Creating video scenes...'
             }, room=session_id)
 
-            print(dialog.dialogue)
+            print(text)
             
-            video = LaIA_video(dialog.dialogue, final_video_ubi=ubi)
+            video = LaIA_video(text, final_video_ubi=ubi)
             
             socketio.emit('video_progress', {
                 'progress': 80,
