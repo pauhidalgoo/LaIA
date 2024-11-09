@@ -82,7 +82,7 @@ class WebSearchAgent:
             Optional[Dict]: Dictionary containing extracted information and metadata
         """
         print("Searching " + str(url) + "...")
-        if depth >= self.max_depth or url in self.visited_urls:
+        if depth >= self.max_depth or url in self.visited_urls or url.endswith(".pdf"):
             return None
             
         try:
@@ -110,6 +110,7 @@ class WebSearchAgent:
                     result = future.result()
                     if result:
                         sub_content.append(result)
+                executor.shutdown(wait=True)
             
             return {
                 'url': url,
@@ -170,7 +171,8 @@ class WebSearchAgent:
                 '#' not in url and  # Not an anchor
                 'javascript:' not in url and  # Not JavaScript
                 url not in self.visited_urls and # Not already visited
-                ".pdf" not in url
+                ".pdf" not in url and
+                not url.endswith(".pdf")
 
             ):
                 links.append(url)
@@ -205,7 +207,8 @@ class WebSearchAgent:
         }
 
         # Define the file path
-        file_path = "./data/context_data.json"
+        filename = re.sub(r'[\\/*?:"<>|]', '_', query.replace(' ', ''))
+        file_path = f"./data/context_data_{filename}.json"
 
         # Save the dictionary as a JSON file
         with open(file_path, 'w') as json_file:
@@ -226,6 +229,46 @@ class WebSearchAgent:
         except Exception as e:
             logger.error(f"Error in synthesis: {str(e)}")
             return "Error synthesizing information from sources."
+    def check_urls(self, url_list):
+        valid_urls = []
+        for url in url_list:
+            try:
+                response = requests.head(url, timeout=5)
+                if response.status_code == 200:
+                    valid_urls.append(url)
+            except requests.RequestException as e:
+                print(f"URL {url} is not accessible. Error: {e}")
+        return valid_urls
+
+    def generate_rag_response(self, question: str, context: str) -> str:
+        """
+        Generates a response based on provided context using Retrieval Augmented Generation (RAG).
+
+        Args:
+            question: The user's question.
+            context: Relevant context extracted from documents.
+
+        Returns:
+            str: The generated response.
+        """
+        try:
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant that answers questions based on provided context."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{question}"}
+            ]
+
+            response = self.client.chat.completions.create(
+                model="tgi",  # Or your preferred model
+                messages=messages,
+                temperature=0.3,
+                max_tokens=1000
+            )
+            return response.choices[0].message.content
+
+        except Exception as e:
+            logger.error(f"Error in RAG response generation: {str(e)}")
+            return "Error generating response based on provided context."
+        
         
     def process_prompt(self, query: str) -> str:
         """
@@ -260,16 +303,7 @@ class WebSearchAgent:
             logger.error(f"Error in synthesis: {str(e)}")
             return "Error synthesizing information from sources."
 
-def check_urls(url_list):
-    valid_urls = []
-    for url in url_list:
-        try:
-            response = requests.head(url, timeout=5)
-            if response.status_code == 200:
-                valid_urls.append(url)
-        except requests.RequestException as e:
-            print(f"URL {url} is not accessible. Error: {e}")
-    return valid_urls
+
 
 # Usage example
 def main():
@@ -295,7 +329,7 @@ def main():
         print("\nResponse:", response)
         responses.extend(re.findall(r"https?://[^\s]+", response))
     print(responses)
-    responses = check_urls(responses)
+    responses = agent.check_urls(responses)
     print(responses)
     
 
