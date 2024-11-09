@@ -170,7 +170,7 @@ def chat():
         print(message)
 
         # Placeholder/Loading message
-        processing_message = session.add_message('assistant', "Thinking...")
+        processing_message = session.add_message('assistant', "Buscant...")
         update_chat_async(session_id, session.messages) 
 
 
