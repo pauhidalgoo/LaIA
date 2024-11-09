@@ -172,13 +172,13 @@ def main():
 	"""Main function with environment validation and error handling."""
 	try:
 		load_dotenv(".env")
-		whisper_url = os.getenv("WHISPER_URL")
-		hf_token = os.getenv("HF_TOKEN")
+		whisper_url = os.environ["WHISPER_URL"]
+		hf_token = os.environ["HF_TOKEN"]
 		
 		if not whisper_url or not hf_token:
 			raise ValueError("Missing required environment variables: WHISPER_URL or HF_TOKEN")
 			
-		stt_service = SpeechToTextService(whisper_url, hf_token)
+		stt_service = SpeechToText(whisper_url, hf_token)
 		
 		# Create output directory
 		output_dir = Path("./data/audio")
