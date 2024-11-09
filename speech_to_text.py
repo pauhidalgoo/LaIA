@@ -10,6 +10,8 @@ import time
 import json
 import queue
 import threading
+import io
+
 
 class SpeechToText:
 	def __init__(self, whisper_url: str, hf_token: str):
@@ -40,6 +42,9 @@ class SpeechToText:
 		self.audio_queue = queue.Queue()
 		self.transcription_thread = None
 		self.current_transcription = ""
+
+		self.audio_buffer = {}
+		self.transcription_threads = {}
 
 	def calibrate_silence_threshold(self, duration=2):
 		"""Calibrate silence threshold based on ambient noise."""
@@ -211,6 +216,67 @@ class SpeechToText:
 		except Exception as e:
 			self.logger.error(f"Error saving recording: {str(e)}")
 			raise
+
+	def process_audio_stream(self, session_id):
+		"""Continuously process audio chunks from the buffer"""
+		buffer = self.audio_buffer[session_id]
+		accumulated_audio = b''
+
+		print("streaming")
+		
+		while True:
+			try:
+				chunk = buffer.get(timeout=1.0)
+				if chunk == b'STOP':
+					# Process final chunk
+					if accumulated_audio:
+						text = self.transcribe_chunk(accumulated_audio)
+						socketio.emit('transcription', {'text': text}, room=session_id)
+					break
+				
+				accumulated_audio += chunk
+				
+				# Process accumulated audio every 3 seconds worth of data
+				if len(accumulated_audio) >= self.sample_rate * 3 * 2:  # 3 seconds of 16-bit audio
+					text = self.transcribe_chunk(accumulated_audio)
+					socketio.emit('transcription', {'text': text}, room=session_id)
+					accumulated_audio = b''
+					
+			except queue.Empty:
+				# Process any remaining audio if we haven't received new data
+				if accumulated_audio:
+					text = self.transcribe_chunk(accumulated_audio)
+					socketio.emit('transcription', {'text': text}, room=session_id)
+					accumulated_audio = b''
+
+	def transcribe_chunk(self, audio_data):
+		"""Transcribe a chunk of audio data"""
+		try:
+			# Convert audio data to WAV format
+			wav_buffer = io.BytesIO()
+			with wave.open(wav_buffer, 'wb') as wf:
+				wf.setnchannels(self.channels)
+				wf.setsampwidth(2)
+				wf.setframerate(self.sample_rate)
+				wf.writeframes(audio_data)
+			
+			wav_data = wav_buffer.getvalue()
+			
+			# Send to Whisper API
+			response = requests.post(
+				self.whisper_url,
+				headers=self.headers,
+				data=wav_data,
+				timeout=30
+			)
+			response.raise_for_status()
+			result = response.json()
+			return result.get("text", "")
+			
+		except Exception as e:
+			self.logger.error(f"Transcription error: {e}")
+			return ""
+	
 
 def main():
 	"""Main function with environment validation and error handling."""
