@@ -17,6 +17,8 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 import numpy as np
 from web_search_agent import WebSearchAgent
 import io
+from document_Manager import DocumentManager
+from select_best_sources import SelectBestSources
 
 load_dotenv()
 
@@ -40,8 +42,8 @@ text_splitter = RecursiveCharacterTextSplitter(
 agent = WebSearchAgent(
     base_url=os.environ["BASE_URL"],
     api_key=os.environ["HF_TOKEN"],
-    max_depth=2,
-    max_links_per_page=3
+    max_depth=1,
+    max_links_per_page=2
 )
 API_URL = os.environ["API_URL"]
 TTS_HEADERS = {
@@ -51,7 +53,7 @@ TTS_HEADERS = {
 class ChatSession:
     def __init__(self):
         self.messages = []
-        self.vector_store = None
+        self.document_manager = None
         self.image_text = None
         
     def add_message(self, role, content, audio_file=None):
@@ -82,19 +84,13 @@ def create_tts(text, filename):
     print("Oh no")
     return False
 
-def process_pdf(file_path):
+def process_pdf_text(file_path):
     with fitz.open(file_path) as pdf:
         text = ""
         for page in pdf:
             text += page.get_text()
     
-    # Split text into chunks
-    chunks = text_splitter.split_text(text)
-    
-    # Create vector store
-    vector_store = FAISS.from_texts(chunks, embeddings)
-    
-    return vector_store, len(chunks)
+    return text
 
 def process_image(file):
     image = Image.open(file)
@@ -105,6 +101,8 @@ def process_image(file):
 def home():
     session_id = str(uuid.uuid4())
     chat_sessions[session_id] = ChatSession()
+    chat_sessions[session_id].document_manager = DocumentManager(embeddings, text_splitter)
+
     return render_template('index.html', session_id=session_id)
 
 @app.route('/chat', methods=['POST'])
@@ -135,18 +133,48 @@ def chat():
         update_chat_async(session_id, session.messages) 
     
         # Generate response based on context
-        if session.vector_store:
+        if len(session.document_manager.documents) != 0:
             # RAG-based response for PDF context
-            docs = session.vector_store.similarity_search(message, k=3)
-            context = "\n".join([doc.page_content for doc in docs])
-            response = agent.generate_rag_response(message, context)
+            print("ragresponse")
+            
+            response = session.document_manager.generate_response(
+                query=message,
+                llm_client=agent.client,
+                include_citations=True
+            )
+
+            print(response)
         
         elif session.image_text:
             response = agent.generate_rag_response(message, session.image_text)
 
         else:
             # Web search-based response
-            response = agent.search_and_analyze(message)
+
+            query = agent.process_prompt(message)
+            base_url = os.environ["BASE_URL"]
+            api_key = os.environ["HF_TOKEN"]
+            select_best_sources = SelectBestSources(base_url=base_url, api_key=api_key, max_source_chars_length=500, max_simultaneous_sources=5, remove_parent_urls=False)
+            query = query.split("\n")
+            for q in query[:3]:
+            # Get response
+                response = agent.search_and_analyze(q)
+                if response != False:
+                    select_best_sources.append_sources(response)
+            responses = select_best_sources.get_final_sources(message)
+            for r in responses:
+                session.document_manager.add_document(
+                    title=f"Web Search: {r[0]}",
+                    content=r[1],
+                    doc_type='web',
+                    source_url=r[0]
+                )
+            response = session.document_manager.generate_response(
+                query=message,
+                llm_client=agent.client,
+                include_citations=True
+            )
+
     
         # Generate audio for response
         if tts_enabled:
@@ -184,8 +212,13 @@ def upload():
         file.save(file_path)
         
         # Process PDF and create vector store
-        vector_store, chunk_count = process_pdf(file_path)
-        session.vector_store = vector_store
+        text = process_pdf_text(file_path)
+
+        document, chunk_count = session.document_manager.add_document(
+            title=file.filename,
+            content=text,
+            doc_type='pdf'
+        )
 
         
         # Add system message about PDF processing
@@ -201,7 +234,13 @@ def upload():
         try:
             text = process_image(file)
             session.image_text = text  # Store extracted text
-            print(text)
+
+            document, chunk_count = session.document_manager.add_document(
+                title=file.filename,
+                content=text,
+                doc_type='image'
+            )
+
             message = session.add_message('system', f"Image processed. Extracted text: {text[:100]}...")
         except Exception as e:
             message = session.add_message('system', f"Error processing image: {e}")
@@ -234,6 +273,26 @@ def serve_audio(filename):
         os.path.join(app.config['AUDIO_FOLDER'], filename),
         mimetype='audio/wav'
     )
+
+@app.route('/documents', methods=['POST'])
+def get_documents():
+    session_id = request.json.get('session_id')  # Use request.json for JSON data
+    if session_id and session_id in chat_sessions:
+        session = chat_sessions[session_id]
+        return jsonify({'documents': session.document_manager.get_document_list()})
+    return jsonify({'error': 'Invalid session ID'}), 400
+
+@app.route('/documents/<doc_id>', methods=['DELETE'])
+def remove_document(doc_id):
+    session_id = request.form.get('session_id')
+    if session_id and session_id in chat_sessions:
+        session = chat_sessions[session_id]
+        success = session.document_manager.remove_document(doc_id)
+        return jsonify({
+            'success': success,
+            'documents': session.document_manager.get_document_list()
+        })
+    return jsonify({'error': 'Invalid file type'}), 400
 
 from flask_socketio import SocketIO, join_room, leave_room
 
