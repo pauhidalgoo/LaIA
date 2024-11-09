@@ -62,7 +62,7 @@ S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informac
             model="tgi",
             messages=self.messages,
             stream=stream,
-            max_tokens=1000,
+            max_tokens=3000,
             temperature=0.1,
             top_p=0.95,
             frequency_penalty=0.05,

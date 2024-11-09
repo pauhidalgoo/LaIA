@@ -34,54 +34,199 @@
         .system-message {
             background: rgba(34, 197, 94, 0.1);
         }
+        .sidebar {
+            width: 4rem; /* collapsed width */
+            height: 100vh;
+            left: 0;
+            top: 0;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar expand on hover */
+        .sidebar:hover {
+            width: 20rem; /* expanded width */
+        }
+
+        /* Sidebar transition for content */
+        .sidebar h2, .sidebar #documentsList, .sidebar #fileInput,.sidebar #pdfInput, .sidebar #urlInput {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        }
+
+        .sidebar:hover h2, .sidebar:hover #documentsList, .sidebar:hover #fileInput,.sidebar:hover #pdfInput, .sidebar:hover #urlInput {
+            opacity: 1;
+        }
+        /* Main Content positioning */
+        .main-content {
+            margin-left: 4rem; /* Offset for collapsed sidebar */
+            transition: margin-left 0.3s;
+        }
+
+        /* Offset adjustment when sidebar expands */
+        .sidebar:hover + .main-content {
+            margin-left: 20rem; /* Offset for expanded sidebar */
+        }
+        .body {
+            overflow-x: hidden;
+            overflow-y: hidden;
+        }
+
+        .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.loading-card {
+    background: rgba(31, 41, 55, 0.5);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 28rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(55, 65, 81, 0.5);
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: rgb(59, 130, 246);
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+.status-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid rgb(59, 130, 246);
+    border-top-color: transparent;
+    border-radius: 50%;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.status-text {
+    color: rgb(209, 213, 219);
+    font-size: 0.875rem;
+}
+
+.time-remaining {
+    color: rgb(156, 163, 175);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+      
     </style>
+    <template id="loading-template">
+        <div class="loading-overlay">
+            <div class="loading-card">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="status-container">
+                    <div class="spinner"></div>
+                    <span class="status-text">Initializing video generation...</span>
+                </div>
+                <div class="time-remaining">
+                    Estimated time remaining: 3 minutes
+                </div>
+            </div>
+        </div>
+    </template>
 </head>
 <body class="gradient-bg min-h-screen text-gray-100">
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-
-        <div class="sidebar p-4">
-            <h2 class="text-xl font-bold mb-4">Documents</h2>
-            <div id="documentsList" class="space-y-2">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar fixed glass-effect p-6 py-12 border-r border-gray-700 overflow-y-auto transition-all duration-300 hover:w-80">
+            <h2 class="text-xl font-bold mb-6">Documents</h2> <!-- Increased margin bottom for spacing -->
+    
+            <!-- File Upload Button -->
+            <div class="mb-6 flex items-center gap-2">
+                <label class="cursor-pointer flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors duration-200" id = "pdfInput">
+                    <input type="file" id="fileInput1" class="hidden" accept=".pdf,image/*">
+                    <i class="fas fa-file-upload text-xl"></i>
+                    <span>Upload PDF</span>
+                </label>
+            </div>
+    
+            <!-- URL Input Field -->
+            <div class="mb-6">
+                <input type="url" 
+                       id="urlInput" 
+                       class="w-full px-3 py-2 rounded-lg bg-white/10 border-0 focus:ring-2 focus:ring-blue-500 outline-none" 
+                       placeholder="Enter document URL...">
+            </div>
+    
+            <!-- Document List -->
+            <div id="documentsList" class="space-y-3">
                 <!-- Documents will be inserted here -->
             </div>
         </div>
-
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-2">LaIA</h1>
-            <p class="text-gray-400">Ask questions, upload documents, or search the web</p>
-        </div>
-
-        <!-- Chat Messages -->
-        <div class="glass-effect rounded-lg p-4 mb-4 message-container overflow-y-auto">
-            <div id="messages" class="space-y-4">
-                <!-- Messages will be inserted here -->
-            </div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="glass-effect rounded-lg p-4">
-            <div class="flex items-center gap-4">
-                <label class="cursor-pointer">
-                    <input type="file" 
-                           id="fileInput" 
-                           class="hidden" 
-                           accept=".pdf,image/*">
-                    <i class="fas fa-file-pdf text-blue-400 hover:text-blue-300 text-xl"></i>
-                </label>
-                
-                <input type="text" 
-                       id="messageInput" 
-                       class="flex-1 px-4 py-2 rounded-lg bg-white/10 border-0 focus:ring-2 focus:ring-blue-500 outline-none"
-                       placeholder="Type your message...">
-                
-                <button id="sendButton" 
-                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2">
-                    <i class="fas fa-paper-plane"></i>
-                    Send
-                </button>
-                <button id="clearContextButton" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200">Clear Context</button>
-                <button id="ttsToggleButton" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200">TTS On</button>
+    
+        <!-- Main Content (Centered) -->
+        <div class="main-content flex-1 flex justify-center items-center ml-20">
+            <div class="max-w-4xl px-4 py-8 w-full">
+                <!-- Header -->
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl font-bold mb-2">🔍 LaIA ✨</h1>
+                    <p class="text-gray-400">Fes preguntes, penja documents o cerca a internet!</p>
+                </div>
+    
+                <!-- Chat Messages -->
+                <div class="glass-effect rounded-lg p-4 mb-4 message-container overflow-y-auto">
+                    <div id="messages" class="space-y-4">
+                        <!-- Messages will be inserted here -->
+                    </div>
+                </div>
+    
+                <!-- Input Area -->
+                <div class="glass-effect rounded-lg p-4">
+                    <div class="flex items-center gap-4">
+                        <label class="cursor-pointer">
+                            <input type="file" id="fileInput" class="hidden" accept=".pdf,image/*">
+                            <i class="fas fa-file-pdf text-blue-400 hover:text-blue-300 text-xl"></i>
+                        </label>
+    
+                        <input type="text" 
+                               id="messageInput" 
+                               class="flex-1 px-4 py-2 rounded-lg bg-white/10 border-0 focus:ring-2 focus:ring-blue-500 outline-none"
+                               placeholder="Type your message...">
+                        
+                        <button id="sendButton" 
+                                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center gap-2">
+                            <i class="fas fa-paper-plane"></i>
+                            Send
+                        </button>
+                        <button id="clearContextButton" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200">Clear Context</button>
+                        <button id="ttsToggleButton" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200">TTS On</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -94,6 +239,9 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const fileInput = document.getElementById('fileInput');
+        const fileInput1 = document.getElementById('fileInput1');
+
+        const urlInput = document.getElementById('urlInput');
         const documentsList = document.getElementById('documentsList');
 
         function getDocumentIcon(type) {
@@ -115,7 +263,7 @@
                     <div class="document-icon">
                         ${getDocumentIcon(doc.type)}
                     </div>
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                         <div class="document-title">${doc.title}</div>
                         <div class="document-meta">
                             ${new Date(doc.timestamp).toLocaleDateString()}
@@ -126,7 +274,7 @@
                                target="_blank">${doc.source_url}</a>
                         ` : ''}
                     </div>
-                    <button class="delete-document p-1 opacity-0 hover:opacity-100 text-red-400"
+                    <button class="delete-document p-1 opacity-1 hover:opacity-100 text-red-400"
                             onclick="removeDocument('${doc.id}')">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -155,6 +303,17 @@
                     `).join('')}
                 </div>`;
             }
+
+            if (message.video_file) {
+            // Render a video player if a video file is provided
+            content += `
+                <div class="mt-2">
+                    <video controls class="w-full rounded-lg">
+                        <source src="${message.video_file}" type="video/mp4">
+                        Your browser does not support the video element.
+                    </video>
+                </div>
+            `;}
             
             if (message.audio_file) {
                 content += `
@@ -328,6 +487,33 @@
             if (e.key === 'Enter') sendMessage();
         });
         fileInput.addEventListener('change', handleFileUpload);
+        fileInput1.addEventListener('change', handleFileUpload);
+
+        async function addUrl() {
+            const message = urlInput.value.trim();
+            console.log(message);
+            if (!message) return;
+            
+            urlInput.value = '';
+            try {
+                const response = await fetch('/url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId , url: message})
+                });
+                const data = await response.json();
+                loadDocuments();
+                console.log("finished")
+            } catch (error) {
+                console.error('Error loading website:', error);
+            }
+            loadDocuments();
+        }
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addUrl();
+        });
 
         // Initial system message
         updateChat([{
@@ -335,6 +521,51 @@
             content: 'Welcome! You can ask questions, search the web, or upload a PDF document for analysis.',
             timestamp: new Date().toISOString()
         }]);
+
+        let loadingScreen = null;
+
+function showLoadingScreen() {
+    const template = document.querySelector('#loading-template');
+    loadingScreen = template.content.cloneNode(true).children[0];
+    document.body.appendChild(loadingScreen);
+    return loadingScreen;
+}
+
+function updateLoadingProgress(progress, status) {
+    if (!loadingScreen) return;
+    
+    const progressFill = loadingScreen.querySelector('.progress-fill');
+    const statusText = loadingScreen.querySelector('.status-text');
+    const timeRemaining = loadingScreen.querySelector('.time-remaining');
+    
+    progressFill.style.width = `${progress}%`;
+    statusText.textContent = status;
+    
+    const minutesLeft = Math.ceil((100 - progress) / 100 * 3);
+    timeRemaining.textContent = `Estimated time remaining: ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}`;
+}
+
+    function hideLoadingScreen() {
+        if (loadingScreen) {
+            loadingScreen.remove();
+            loadingScreen = null;
+        }
+    }
+
+    // Modify your socket listeners
+    socket.on('video_generation_start', () => {
+        showLoadingScreen();
+    });
+
+    socket.on('video_progress', (data) => {
+        updateLoadingProgress(data.progress, data.status);
+    });
+
+    socket.on('video_generation_complete', () => {
+        hideLoadingScreen();
+    });
+
+
     </script>
 </body>
 </html>

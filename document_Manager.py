@@ -122,6 +122,28 @@ class DocumentManager:
             }
             for doc in self.documents.values()
         ]
+    
+    def get_context(self, 
+                        query: str,
+                        llm_client,
+                        k: int = 2,
+                        include_citations: bool = True) -> Dict:
+        """Generate a response using RAG with citations"""
+        relevant_chunks = self.search(query, k=k, llm_client= llm_client)
+        
+        if not relevant_chunks:
+            return {
+                'response': 'No relevant context found to answer the question.',
+                'citations': []
+            }
+            
+        # Prepare context with citations
+        context = "\n\n".join([
+            f"{chunk['content']}"
+            for i, chunk in enumerate(relevant_chunks)
+        ])
+        
+        return context
 
     def generate_response(self, 
                          query: str,
@@ -153,7 +175,7 @@ class DocumentManager:
         
         response = llm_client.chat.completions.create(
             model="tgi",
-            
+            max_tokens=1000,
             messages=messages,
             temperature=0.3
         )
