@@ -16,27 +16,12 @@ class SelectBestSources:
 		)
 		self.max_source_length = max_source_length
 		self.gathered_info = None
+		self.returned_sources = []
 
 	def set_gathered_info(self, gathered_info_json_path: str) -> None:
 		self.gathered_info = json.load(open(gathered_info_json_path, 'r'))
 
-	def url_in_gathered_info(self, url: str) -> bool:
-		def aux(source: dict):
-			if source["url"] == url:
-				return True
-			elif source["sub_content"]:
-				return any(aux(sub_source) for sub_source in source["sub_content"])
-			else:
-				return False
-		
-		sources = self.gathered_info["gathered_info"]
-		return any(aux(source) for source in sources)
-
 	def valid_url(self, url: str) -> bool:
-		# Check if the URL is inside the json file
-		if not self.url_in_gathered_info(url):
-			return False
-		
 		# Check if the URL is valid
 		try:
 			r = requests.head(url, allow_redirects=True)
@@ -46,34 +31,38 @@ class SelectBestSources:
 			logger.warning(f"Failed to reach {url}: {str(e)}")
 
 		return False
-			
-	def select_best_sources(self, query: str, gathered_info_json_path: str) -> list[str]:
-		context = f"Query: {query}\n\nSources and gathered information:\n"
-
+	
+	def get_sources_list_from_gathered_info(self) -> list[str]:
+		def aux(source: dict):
+			if source["sub_content"]:
+				return [(source["url"], source["main_content"])] + [aux(sub_source) for sub_source in source["sub_content"]]
+			else:
+				return [(source["url"], source["main_content"])]
+		
+		sources = self.gathered_info["gathered_info"]
+		
+		return [aux(source) for source in sources]
+	
+	def append_sources(self, query: str, gathered_info_json_path: str) -> None:
 		self.set_gathered_info(gathered_info_json_path)
 
-		for info in self.gathered_info:
-			context += f"\nSource: {info['url']}\n"
-			context += f"Content: {info['main_content'][:self.max_source_length]}...\n"
+		sources_list = self.get_sources_list_from_gathered_info()
+
+		best_sources = self.select_best_sources(query=query, sources=sources_list)
+			
+	def select_best_sources(self, query: str, sources: list[dict], return_sources: bool = False) -> list[tuple]|None:
+		assert self.gathered_info is not None, "Gathered information is not set. Please set it using the set_gathered_info method."
+
+		context = f"Query: {query}\n\nSources and gathered information:\n"
+
+		for info in sources:
+			context += f"\nSource: {info[0]}\n"
+			context += f"Content: {info[1][:self.max_source_length]}...\n"
 		
 		messages = [
 			{"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sources to provide accurate and comprehensive answers. You will be given a query and a list of sources with their main content. Your goal is to provide a list of the sources that contain the information needed to answer the query."},
 			{"role": "user", "content": f"Based on the following information, provide a list of the sources that satisfy the query. Provide all the URLs needed (between the text).{context}"}
 		]
-		data_to_save = {
-			"query": query,
-			"gathered_info": self.gathered_info,
-			"messages": messages
-		}
-
-		# Define the file path
-		file_path = "./data/context_data.json"
-
-		# Save the dictionary as a JSON file
-		with open(file_path, 'w') as json_file:
-			json.dump(data_to_save, json_file, indent=4)
-
-		print(f"Data saved to {file_path}")
 
 		try:
 			response = self.client.chat.completions.create(
@@ -83,11 +72,26 @@ class SelectBestSources:
 				max_tokens=1000
 			)
 			
-			urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', response.choices[0].message['content'])
-			valid_urls = [url for url in urls if self.valid_url(url, gathered_info_json_path)]
+			selected_urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', response.choices[0].message['content'])
+
+			all_urls = [s[0] for s in sources]
+			all_contents = [s[1] for s in sources]
 			
-			return valid_urls
+			valid_urls = []
+			for url in selected_urls:
+				if url in all_urls and self.valid_url(url):
+					valid_urls.append(url)
+
+			valid_urls_and_contents = [(url, all_contents[all_urls.index(url)]) for url in valid_urls]
+			
+			if not return_sources:
+				self.returned_sources += valid_urls_and_contents
+			else:
+				return valid_urls_and_contents
 			
 		except Exception as e:
 			logger.error(f"Error in synthesis: {str(e)}")
 			return "Error synthesizing information from sources."
+		
+	def get_final_sources(self, original_query: str) -> list[tuple]:
+		return self.select_best_sources(query=original_query, sources=self.returned_sources, return_sources=True)
