@@ -121,10 +121,6 @@ async def process_audio_files():
         for audio_file in audio_files:
             os.remove(audio_file)
         print("Final audio saved as 'final_conversation.wav'.")
-
-    print("Time Stamps for Each Line (adjusted for speed):")
-    for start, end, text in time_stamps:
-        print(f"Start: {start:.2f}s, End: {end:.2f}s, Text: {text}")
     
     return time_stamps
 

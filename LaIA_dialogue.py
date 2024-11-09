@@ -2,18 +2,22 @@
 from dotenv import load_dotenv
 import os
 from openai import OpenAI
-load_dotenv(".env")
-
-HF_TOKEN = os.environ["HF_TOKEN"]
-BASE_URL = os.environ["BASE_URL"]
 
 
-#pip install openai
-client = OpenAI(
-       base_url=BASE_URL + "/v1/",
-       api_key=HF_TOKEN
-   )
-messages = [{ "role": "system", "content": """"Ets un assistent en català que crea un diàleg entre dues persones, el Cai i la LaIA, sobre diversos tràmits administratius com beques, ajuts, permisos i altres serveis públics. En aquest diàleg, el Cai fa una pregunta inicial general sobre el tràmit i només afegeix alguna intervenció molt breu per mantenir la conversa natural, sense entrar en detalls. La LaIA és qui proporciona respostes completes, cobertes de tots els aspectes importants, incloent-hi informació addicional i anticipant qualsevol dubte que el Cai pugui tenir.
+class LaIA_dialogue:
+      def __init__(self, text='',messages=[], prompt=""):
+         assert text, "Text is required"
+         load_dotenv(".env")
+         self.messages = messages
+         self.HF_TOKEN = os.environ["HF_TOKEN"]
+         self.BASE_URL = os.environ["BASE_URL"]
+         self._client()
+
+         self.text = text
+         if prompt:
+            self.prompt = prompt
+         else:
+            self.prompt = """Ets un assistent en català que crea un diàleg entre dues persones, el Cai i la LaIA, sobre diversos tràmits administratius com beques, ajuts, permisos i altres serveis públics. En aquest diàleg, el Cai fa una pregunta inicial general sobre el tràmit i només afegeix alguna intervenció molt breu per mantenir la conversa natural, sense entrar en detalls. La LaIA és qui proporciona respostes completes, cobertes de tots els aspectes importants, incloent-hi informació addicional i anticipant qualsevol dubte que el Cai pugui tenir.
 
 Directrius per a la conversa:
 
@@ -32,68 +36,43 @@ Com ha de finalitzar el diàleg: La LaIA ha de tancar amb una frase amable, indi
 Quin és l'objectiu final: Generar una conversa on el Cai només fa una pregunta inicial general i, com a màxim, alguna intervenció molt breu i reactiva. La LaIA cobreix tota la informació en una resposta detallada i anticipativa, fent que el diàleg sembli natural, complet i informatiu sense necessitat de més preguntes per part del Cai.
              
 S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informació possible i encara més detalls extres així que el Cai només ha de preguntar com a molt 3 vegades qüestions molt específiques. S'ha de complir que les preguntes del Cai comencin de maneres diferents per evitar repeticions quan el Cai parla ha de donar gràcies a la Laia o dir-li d'acord d'alguna manera. Quan la Laia parla, si Cai li ha fet una molt bona pregunta cal que li comenti que és molt important el que ha dit fent molt més natural la interacció. Finalment no s'han de realitzar cap pregunta que no es pugui respondre amb la informació donada.
-"""}]
+"""
 
-messages.append( {"role":"user", "content": """A contiuació tens la informació del tràmit per tal de poder crear el diàleg: """})
-messages.append( {"role":"user", "content": """IMPORTANT:
-
-Tots els tràmits d'aquesta convocatòria es faran exclusivament per internet.
-
-La beca Equitat consisteix en l’aplicació d’un percentatge de minoració fins a un màxim del 80%, segons el tram de renda assignat i els estudis que cursis, en el preu de la matrícula (crèdits ordinaris matriculats per 1a vegada).
-
-L’acreditació de tram de renda familiar és un document que us informarà de quin tram de renda familiar us correspon (entre l'1 i el 2 o fora de trams). Aquest document és exclusivament de caràcter informatiu i no genera el dret a la beca Equitat.
-
-No cal demanar la beca general per optar-hi.
-
-Qui pot sol·licitar la beca?
-
-Persones que cursin estudis universitaris oficials de grau o de màster habilitant en una de les universitats públiques de Catalunya, a la UOC o a algun dels 3 centres adscrits que hi participen.
-
-Quan la sol·licito?
-
-Termini de sol·licituds per al curs 2024-2025: Del 16 de setembre al 31 d'octubre de 2024 a les 14:00 h (hora local de Barcelona) ambdós inclosos.
-
-La sol·licitud es realitza per via electrònica. Heu d'accedir a través de l'apartat "Tràmits gencat" del web de la Generalitat de Catalunya o des de la pàgina web de l'AGAUR.
-
-Cal disposar d'un mecanisme d'identificació digital, a nom de la persona sol·licitant. Us recomanem l'idCat Mòbil.
-
-Com sabré l’estat de la meva beca? Què és el codi ID?
-
-La tramitació de les sol·licituds de beques gestionades per l'AGAUR es realitza a través del portal Tràmits gencat, amb el codi identificador (codi ID) associat a la sol·licitud.
-
-Aquest codi ID consta en el resguard de la beca sol·licitada.
-
-Per a més informació, consulta les preguntes més freqüents.
-
-Els ajuts depenen del nombre de crèdits matriculats? Quin import cobreix la beca de matrícula?
-
-No hi ha requisits acadèmics.
-
-No obstant la minoració del preu de la matrícula no cobreix els següents conceptes: Els preus de gestió de la matrícula, de suport a l’aprenentatge, dels crèdits matriculats per segona i successives vegades, els crèdits convalidats, reconeguts i/o adaptats i les quotes de l’assegurança escolar o qualsevol altra associada a la matrícula.
-
-Tampoc els crèdits que excedeixin del mínim necessari per a obtenir la titulació per a la qual se sol·licita la beca.
-
-És incompatible amb la beca general del Ministeri?
-
-Si se’t concedeix la beca General, la beca Equitat quedarà sense efecte. En cas que se’t denegui la beca General, si has demanat també la beca equitat i se't concedeix, se t'aplicarà la minoració que et correspongui.
-
-És recomanable que les demanis totes dues beques."""})
-stream = False
-chat_completion = client.chat.completions.create(
-   model="tgi",
-   messages=messages,
-   stream=stream,
-   max_tokens=1000,
-   temperature=0.1,
-   top_p=0.95,
-   frequency_penalty=0.05,
-)
-text = ""
-if stream:
- for message in chat_completion:
-   text += message.choices[0].delta.content
-   print(message.choices[0].delta.content, end="")
- print(text)
-else:
- text = chat_completion.choices[0].message.content
- print(text)
+      def _client(self):
+         """
+         Create an OpenAI client
+         """
+         self.client = OpenAI(
+               base_url=self.BASE_URL + "/v1/",
+               api_key=self.HF_TOKEN
+             )
+         
+      def create_dialogue(self):
+         """
+         Function to create a dialogue given a text and a prompt.
+         
+         Returns:
+         str: dialogue
+         """
+         self.messages.append({"role":"user", "content": f'{self.prompt}'})
+         self.messages.append( {"role":"user", "content": """A continuació tens la informació del tràmit per tal de poder crear el diàleg: """})
+         self.messages.append( {"role":"user", "content": f'{self.text}'})
+         stream = False
+         chat_completion = self.client.chat.completions.create(
+            model="tgi",
+            messages=self.messages,
+            stream=stream,
+            max_tokens=1000,
+            temperature=0.1,
+            top_p=0.95,
+            frequency_penalty=0.05,
+         )
+         text = ""
+         if stream:
+            for message in chat_completion:
+               text += message.choices[0].delta.content
+               print(message.choices[0].delta.content, end="")
+            print(text)
+         else:
+            text = chat_completion.choices[0].message.content
+            print(text)
