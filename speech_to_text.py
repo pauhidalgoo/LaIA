@@ -40,7 +40,7 @@ class SpeechToText:
 		self.audio_queue = queue.Queue()
 		self.transcription_thread = None
 		self.current_transcription = ""
-		
+
 	def calibrate_silence_threshold(self, duration=2):
 		"""Calibrate silence threshold based on ambient noise."""
 		self.logger.info("Calibrating silence threshold...")
@@ -61,6 +61,11 @@ class SpeechToText:
 		# Set silence threshold based on average ambient noise
 		self.silence_threshold = np.mean(silence_samples) * 1.5
 		self.logger.info(f"Calibrated silence threshold to: {self.silence_threshold}")
+	
+	def stop_recording(self):
+		"""Forcefully stop the recording."""
+		self.is_recording = False
+		self.logger.info("Recording forcefully stopped.")
 
 	def start_recording(self, filename="output.wav"):
 		"""Start recording audio and transcribing in real-time."""
