@@ -93,7 +93,7 @@ chat_completion = client.chat.completions.create(
    messages=messages,
    stream=stream,
    max_tokens=1000,
-   temperature=0.075,
+   temperature=0.1,
    top_p=0.95,
    frequency_penalty=0.05,
 )
