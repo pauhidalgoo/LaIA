@@ -71,8 +71,7 @@ S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informac
          if stream:
             for message in chat_completion:
                text += message.choices[0].delta.content
-               print(message.choices[0].delta.content, end="")
-            print(text)
          else:
             text = chat_completion.choices[0].message.content
-            print(text)
+         
+         self.dialogue = text
