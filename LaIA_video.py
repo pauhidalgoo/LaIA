@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from pydub import AudioSegment
 from moviepy.editor import ImageClip, AudioFileClip, TextClip, CompositeVideoClip, concatenate_videoclips
 from textwrap import fill
+from moviepy.video.fx.all import fadein, fadeout
 from openai import OpenAI
 import random
 
@@ -148,7 +149,7 @@ class LaIA_video:
         Categories:
         {categories_text}
 
-        Once you have selected the category, I will retrieve all images within that folder.
+        You must only select one category from the list above and provide it, forget about the dialogue just focus on the category.
         """
 
         messages = [{ "role": "system", "content": f'{prompt}'}]
@@ -175,7 +176,9 @@ class LaIA_video:
 
         # Function to detect the selected_category from the model output, the class are stored in categories variable
         def detect_selected_category(text, categories):
+            print(text)
             for category in categories:
+                print(category)
                 if category.lower() in text.lower():
                     return category
             return random.choice(categories)
