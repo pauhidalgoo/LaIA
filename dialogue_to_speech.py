@@ -95,6 +95,9 @@ async def process_audio_files():
     ssl_context = ssl.create_default_context(cafile=certifi.where())  # Use certifi for SSL context
     connector = aiohttp.TCPConnector(ssl=ssl_context)  # Set up connector with SSL context
 
+    time_stamps = []  # List to store (start, end, text) for each line
+    start_time = 0    # Initialize start time for the first line
+
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
             generate_audio(session, speaker, text, i)
@@ -107,18 +110,26 @@ async def process_audio_files():
 
         # Concatenate all generated audio files
         final_audio = AudioSegment.empty()
-        for audio_file in audio_files:
+        for i, audio_file in enumerate(audio_files):
             segment = AudioSegment.from_wav(audio_file)
+            end_time = start_time + segment.duration_seconds  # Calculate end time for the line
+            time_stamps.append((start_time, end_time, lines[i][1]))  # Append (start, end, text) to the list
+            start_time = end_time  # Update start time for the next line
             final_audio += segment
 
-        # Speed up final audio by 1.25x
-        final_audio = final_audio.speedup(playback_speed=1.25)
+        # Speed up final audio by 1.15x
+        final_audio = final_audio.speedup(playback_speed=1.15)
         
         # Export final audio and delete intermediate files
         final_audio.export("final_conversation.wav", format="wav")
         for audio_file in audio_files:
             os.remove(audio_file)
         print("Final audio saved as 'final_conversation.wav'.")
+    
+    # Output the time stamps
+    print("Time Stamps for Each Line:")
+    for start, end, text in time_stamps:
+        print(f"Start: {start:.2f}s, End: {end:.2f}s, Text: {text}")
 
 # Run the async process
 asyncio.run(process_audio_files())

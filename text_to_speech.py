@@ -15,7 +15,7 @@ def query(text):
    data = {"text": text, "voice": 20}
    return requests.post(API_URL, headers=headers, json=data)
 
-response = query("cai gei cai gei cai gei")
+response = query("Hola bon dia soc un gat de color verd")
 
 print(response)
 
