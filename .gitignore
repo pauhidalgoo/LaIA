@@ -2,3 +2,5 @@
 .venv/
 /data
 /static
+/faiss_index/
+__pycache__
