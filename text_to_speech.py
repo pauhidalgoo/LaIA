@@ -6,7 +6,7 @@ load_dotenv(".env")
 API_URL = os.environ["API_URL"]
 HF_TOKEN = os.environ["HF_TOKEN"]
 
-
+print(API_URL)
 headers = {
    "Authorization": f"Bearer {HF_TOKEN}",
 }
