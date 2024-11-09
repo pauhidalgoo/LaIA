@@ -1,8 +1,11 @@
 import os
-from dotenv import load_dotenv
-import requests
-from pydub import AudioSegment
 import re
+import ssl
+import certifi
+import asyncio
+import aiohttp
+from dotenv import load_dotenv
+from pydub import AudioSegment
 
 # Load environment variables
 load_dotenv(".env")
@@ -59,13 +62,13 @@ LaIA: Sí, és recomanable demanar les dues beques, ja que la beca Equitat compl
 Cai: Moltes gràcies, LaIA.
 
 LaIA: De res, Cai. Si tens més preguntes, no dubtis a consultar-me.
-""" 
+"""
 
 # Extract and organize lines as tuples in the format (speaker, text)
 lines = re.findall(r'(Cai|LaIA): (.+?)(?=\n(?:Cai|LaIA):|$)', dialogue_text, re.DOTALL)
 
-# Function to generate TTS for a given speaker and text
-def generate_audio(speaker, text, file_index):
+# Async function to generate TTS for a given speaker and text
+async def generate_audio(session, speaker, text, file_index):
     voice = "grau" if speaker == "Cai" else "elia"
     accent = "central"
     payload = {
@@ -73,40 +76,49 @@ def generate_audio(speaker, text, file_index):
         "voice": voice,
         "accent": accent
     }
+    audio_filename = f"{file_index}_{speaker}.wav"
     
     try:
-        response = requests.post(MATCHA_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        audio_filename = f"{file_index}_{speaker}.wav"
-        
-        with open(audio_filename, "wb") as audio_file:
-            audio_file.write(response.content)
+        async with session.post(MATCHA_URL, headers=headers, json=payload) as response:
+            response.raise_for_status()
+            with open(audio_filename, "wb") as audio_file:
+                audio_file.write(await response.read())
         return audio_filename
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error: {http_err}")
+    except aiohttp.ClientError as e:
+        print(f"Client error: {e}")
     except Exception as err:
-        print(f"Other error: {err}")
+        print(f"Error: {err}")
     return None
 
-# Generate and store audio files for each line
-audio_files = []
-for i, (speaker, text) in enumerate(lines):
-    print(f"Generating audio for: {speaker} - '{text[:50]}...'")  # Display the beginning of each line
-    audio_file = generate_audio(speaker, text, i)
-    if audio_file:
-        audio_files.append(audio_file)
+# Main async function to process all lines and generate audio files
+async def process_audio_files():
+    ssl_context = ssl.create_default_context(cafile=certifi.where())  # Use certifi for SSL context
+    connector = aiohttp.TCPConnector(ssl=ssl_context)  # Set up connector with SSL context
 
-# Concatenate all generated audio files
-final_audio = AudioSegment.empty()
-for audio_file in audio_files:
-    segment = AudioSegment.from_wav(audio_file)
-    final_audio += segment
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [
+            generate_audio(session, speaker, text, i)
+            for i, (speaker, text) in enumerate(lines)
+        ]
+        
+        # Gather all audio file names
+        audio_files = await asyncio.gather(*tasks)
+        audio_files = [file for file in audio_files if file is not None]  # Filter out None values
 
-# Export final audio and delete intermediate files
-final_audio.export("final_conversation.wav", format="wav")
+        # Concatenate all generated audio files
+        final_audio = AudioSegment.empty()
+        for audio_file in audio_files:
+            segment = AudioSegment.from_wav(audio_file)
+            final_audio += segment
 
-# Clean up old individual audio files
-for audio_file in audio_files:
-    os.remove(audio_file)
+        # Speed up final audio by 1.25x
+        final_audio = final_audio.speedup(playback_speed=1.25)
+        
+        # Export final audio and delete intermediate files
+        final_audio.export("final_conversation.wav", format="wav")
+        for audio_file in audio_files:
+            os.remove(audio_file)
+        print("Final audio saved as 'final_conversation.wav'.")
 
-print("Final audio saved as 'final_conversation.wav'.")
+# Run the async process
+asyncio.run(process_audio_files())
