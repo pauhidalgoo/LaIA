@@ -16,12 +16,12 @@ class SelectBestSources:
 		)
 		self.max_source_length = max_source_length
 		self.gathered_info = None
-		self.returned_sources = []
+		self.selected_sources = []
 
-	def set_gathered_info(self, gathered_info_json_path: str) -> None:
+	def __set_gathered_info(self, gathered_info_json_path: str) -> None:
 		self.gathered_info = json.load(open(gathered_info_json_path, 'r'))
 
-	def valid_url(self, url: str) -> bool:
+	def __valid_url(self, url: str) -> bool:
 		# Check if the URL is valid
 		try:
 			r = requests.head(url, allow_redirects=True)
@@ -32,7 +32,7 @@ class SelectBestSources:
 
 		return False
 	
-	def get_sources_list_from_gathered_info(self) -> list[str]:
+	def __get_sources_list_from_gathered_info(self) -> list[str]:
 		def aux(source: dict):
 			if source["sub_content"]:
 				return [(source["url"], source["main_content"])] + [aux(sub_source) for sub_source in source["sub_content"]]
@@ -42,15 +42,8 @@ class SelectBestSources:
 		sources = self.gathered_info["gathered_info"]
 		
 		return [aux(source) for source in sources]
-	
-	def append_sources(self, query: str, gathered_info_json_path: str) -> None:
-		self.set_gathered_info(gathered_info_json_path)
-
-		sources_list = self.get_sources_list_from_gathered_info()
-
-		best_sources = self.select_best_sources(query=query, sources=sources_list)
 			
-	def select_best_sources(self, query: str, sources: list[dict], return_sources: bool = False) -> list[tuple]|None:
+	def __select_best_sources(self, query: str, sources: list[dict]) -> list[tuple]:
 		assert self.gathered_info is not None, "Gathered information is not set. Please set it using the set_gathered_info method."
 
 		context = f"Query: {query}\n\nSources and gathered information:\n"
@@ -79,19 +72,31 @@ class SelectBestSources:
 			
 			valid_urls = []
 			for url in selected_urls:
-				if url in all_urls and self.valid_url(url):
+				if url in all_urls and self.__valid_url(url):
 					valid_urls.append(url)
 
 			valid_urls_and_contents = [(url, all_contents[all_urls.index(url)]) for url in valid_urls]
 			
-			if not return_sources:
-				self.returned_sources += valid_urls_and_contents
-			else:
-				return valid_urls_and_contents
+			return valid_urls_and_contents
 			
 		except Exception as e:
 			logger.error(f"Error in synthesis: {str(e)}")
 			return "Error synthesizing information from sources."
 		
+	def get_current_sources(self) -> list[tuple]:
+		return self.selected_sources
+	
+	def reset_current_sources(self) -> None:
+		self.selected_sources = []
+	
+	def append_sources(self, query: str, gathered_info_json_path: str) -> None:
+		self.__set_gathered_info(gathered_info_json_path)
+
+		sources_list = self.__get_sources_list_from_gathered_info()
+
+		best_sources = self.__select_best_sources(query=query, sources=sources_list)
+
+		self.selected_sources += best_sources
+
 	def get_final_sources(self, original_query: str) -> list[tuple]:
-		return self.select_best_sources(query=original_query, sources=self.returned_sources, return_sources=True)
+		return self.__select_best_sources(query=original_query, sources=self.selected_sources)
