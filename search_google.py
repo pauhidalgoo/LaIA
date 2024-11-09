@@ -10,6 +10,7 @@ from googlesearch import search
 import concurrent.futures
 import logging
 import json
+import re
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -259,6 +260,17 @@ class WebSearchAgent:
             logger.error(f"Error in synthesis: {str(e)}")
             return "Error synthesizing information from sources."
 
+def check_urls(url_list):
+    valid_urls = []
+    for url in url_list:
+        try:
+            response = requests.head(url, timeout=5)
+            if response.status_code == 200:
+                valid_urls.append(url)
+        except requests.RequestException as e:
+            print(f"URL {url} is not accessible. Error: {e}")
+    return valid_urls
+
 # Usage example
 def main():
     load_dotenv(".env")
@@ -281,7 +293,10 @@ def main():
     # Get response
         response = agent.search_and_analyze(q)
         print("\nResponse:", response)
-        responses.append(response)
+        responses.extend(re.findall(r"https?://[^\s]+", response))
+    print(responses)
+    responses = check_urls(responses)
+    print(responses)
     
 
 if __name__ == "__main__":
