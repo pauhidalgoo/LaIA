@@ -34,7 +34,7 @@ os.makedirs(app.config['AUDIO_FOLDER'], exist_ok=True)
 # Initialize components
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
+    chunk_size=4000,
     chunk_overlap=200,
     length_function=len,
 )
@@ -43,7 +43,7 @@ agent = WebSearchAgent(
     base_url=os.environ["BASE_URL"],
     api_key=os.environ["HF_TOKEN"],
     max_depth=1,
-    max_links_per_page=2
+    max_links_per_page=1
 )
 API_URL = os.environ["API_URL"]
 TTS_HEADERS = {
@@ -70,7 +70,6 @@ class ChatSession:
 chat_sessions = {}
 
 def create_tts(text, filename):
-    print("AAAA create tts")
     API_URL = os.environ["API_URL"]
     headers = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
     
@@ -105,6 +104,40 @@ def home():
 
     return render_template('index.html', session_id=session_id)
 
+@app.route('/transcribe', methods=['POST'])
+def transcribe_audio():
+    if 'audio' not in request.files:
+        return jsonify({'error': 'No audio file provided'}), 400
+        
+    audio_file = request.files['audio']
+    session_id = request.form.get('session_id')
+    
+    if not session_id or session_id not in chat_sessions:
+        return jsonify({'error': 'Invalid session'}), 400
+    
+    try:
+        # Create a temporary file to save the audio
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+            audio_file.save(tmp_file.name)
+            
+            # Start recording and get transcription
+            transcription = stt_service.start_recording(tmp_file.name)
+            
+            # Clean up the temporary file
+            os.unlink(tmp_file.name)
+            
+            return jsonify({
+                'transcription': transcription,
+                'success': True
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+
 @app.route('/chat', methods=['POST'])
 def chat():
     print(f"Incoming request data: {request.get_json()}")
@@ -114,15 +147,12 @@ def chat():
     message_type = data.get('message_type', 'text') 
     tts_enabled = data.get('tts_enabled', True)
     
-    print("no")
     if not session_id or session_id not in chat_sessions:
-        print("fuck")
         return jsonify({'error': 'Invalid session'}), 400
         
     session = chat_sessions[session_id]
     
     # Add user message to history
-    print("aa")
     if message_type == 'text':
         print(session)
         session.add_message('user', message)
@@ -137,16 +167,42 @@ def chat():
             # RAG-based response for PDF context
             print("ragresponse")
             
-            response = session.document_manager.generate_response(
+            output = session.document_manager.generate_response(
                 query=message,
                 llm_client=agent.client,
                 include_citations=True
             )
 
-            print(response)
-        
-        elif session.image_text:
-            response = agent.generate_rag_response(message, session.image_text)
+            response = output['response']
+            citations = output['citations']
+
+            if response == 'No relevant context found to answer the question.':
+                query = agent.process_prompt(message)
+                base_url = os.environ["BASE_URL"]
+                api_key = os.environ["HF_TOKEN"]
+                select_best_sources = SelectBestSources(base_url=base_url, api_key=api_key, max_source_chars_length=500, max_simultaneous_sources=5, remove_parent_urls=False)
+                query = query.split("\n")
+                for q in query[:3]:
+                # Get response
+                    output = agent.search_and_analyze(q)
+                    if output != False:
+                        select_best_sources.append_sources(output)
+                responses = select_best_sources.get_final_sources(message)
+                for r in responses:
+                    session.document_manager.add_document(
+                        title=f"Web Search: {r[0]}",
+                        content=r[1],
+                        doc_type='web',
+                        source_url=r[0]
+                    )
+                output = session.document_manager.generate_response(
+                    query=message,
+                    max_tokens=1000,
+                    llm_client=agent.client,
+                    include_citations=True
+                )
+                response = output['response']
+                citations = output['citations']
 
         else:
             # Web search-based response
@@ -158,9 +214,9 @@ def chat():
             query = query.split("\n")
             for q in query[:3]:
             # Get response
-                response = agent.search_and_analyze(q)
-                if response != False:
-                    select_best_sources.append_sources(response)
+                output = agent.search_and_analyze(q)
+                if output != False:
+                    select_best_sources.append_sources(output)
             responses = select_best_sources.get_final_sources(message)
             for r in responses:
                 session.document_manager.add_document(
@@ -169,12 +225,14 @@ def chat():
                     doc_type='web',
                     source_url=r[0]
                 )
-            response = session.document_manager.generate_response(
+            output = session.document_manager.generate_response(
                 query=message,
+                max_tokens=1000,
                 llm_client=agent.client,
                 include_citations=True
             )
-
+            response = output['response']
+            citations = output['citations']
     
         # Generate audio for response
         if tts_enabled:
@@ -185,6 +243,7 @@ def chat():
             tts_success = False
 
         processing_message['content'] = response
+        processing_message['citations'] = citations
         processing_message['audio_file'] = audio_filename if tts_success else None
         return jsonify({'history': session.messages})
     
@@ -281,6 +340,29 @@ def get_documents():
         session = chat_sessions[session_id]
         return jsonify({'documents': session.document_manager.get_document_list()})
     return jsonify({'error': 'Invalid session ID'}), 400
+
+
+
+@app.route('/url', methods=['POST'])
+def push_url():
+    print("RECIEVED SOMETHING")
+    session_id = request.json.get('session_id')  # Use request.json for JSON data
+    url = request.json.get('url')
+    print("Here's the url", url)
+    if session_id and session_id in chat_sessions:
+        newweb = agent.simple_web(url)
+        session = chat_sessions[session_id]
+        document, chunk_count = session.document_manager.add_document(
+            title=f"Web Search: {url}",
+            content=newweb,
+            doc_type='web',
+            source_url = url
+        )
+
+        return jsonify({'text': "Done"})
+    return jsonify({'error': 'Invalid session ID'}), 400
+
+
 
 @app.route('/documents/<doc_id>', methods=['DELETE'])
 def remove_document(doc_id):
