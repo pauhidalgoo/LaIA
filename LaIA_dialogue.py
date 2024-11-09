@@ -17,25 +17,24 @@ class LaIA_dialogue:
          if prompt:
             self.prompt = prompt
          else:
-            self.prompt = """Ets un assistent en català que crea un diàleg entre dues persones, el Cai i la LaIA, sobre diversos tràmits administratius com beques, ajuts, permisos i altres serveis públics. En aquest diàleg, el Cai fa una pregunta inicial general sobre el tràmit i només afegeix alguna intervenció molt breu per mantenir la conversa natural, sense entrar en detalls. La LaIA és qui proporciona respostes completes, cobertes de tots els aspectes importants, incloent-hi informació addicional i anticipant qualsevol dubte que el Cai pugui tenir.
+            self.prompt = """Genera un diàleg en català entre el Cai i la LaIA sobre un tràmit administratiu (com beques, ajuts, permisos o altres serveis públics). El diàleg ha de ser breu, informatiu i amb un to amable, seguint aquestes instruccions:
 
-Directrius per a la conversa:
+Rol de Cai: Comença amb una pregunta general sobre el tràmit i, si és necessari, fa una o dues intervencions molt breus després. El seu paper és reactiu, i no fa preguntes detallades. En acabar, el Cai pot agrair la informació amb una frase breu.
 
-Què fa el personatge Cai: Comença amb una pregunta general sobre el tràmit en concret i fa molt poques intervencions breus després, només per mantenir la conversa fluida. Evita fer preguntes detallades o segmentades; el seu paper és principalment reactiu.
+Rol de LaIA: Respon de manera completa i anticipa possibles dubtes del Cai. Inclou informació rellevant sobre el tràmit (funcionament, requisits, terminis, documents necessaris, etc.) en una sola resposta extensa, de manera que el Cai no necessiti fer més preguntes. La resposta ha de ser clara i fàcil de seguir.
 
-Què fa el personatge LaIA: Respon amb explicacions llargues, completes i naturals, cobrint tots els aspectes possibles del tràmit en una sola resposta extensa. Ha de proporcionar informació sobre el funcionament, requisits, terminis, documents necessaris, possibles incompatibilitats i consells, de manera que el Cai no hagi de preguntar més detalls. La LaIA s’assegura d'anticipar qualsevol dubte que podria sorgir.
+To i estructura: La LaIA ha de sonar propera, informativa i accessible, com si parlés en una conversa natural. Les respostes han de ser coherents i detallades, cobrint tots els aspectes importants per evitar preguntes addicionals.
 
-Com ha de ser el to de la conversa: La LaIA ha de sonar propera, informativa i accessible. La seva resposta ha d’incloure detalls i transicions suaus entre temes, oferint una explicació fàcil de seguir i completa, com si parlés amb algú en una conversa natural. La LaIA i el Cai han de mantenir un to amable i les seves interaccions han d'estar connectades de manera coherent.
+Finalització: La conversa ha de ser curta. La LaIA acaba amb una frase de comiat amable, assegurant que el Cai té tota la informació necessària.
 
-Com és l'estructura de resposta: La LaIA cobreix tots els temes rellevants en una resposta completa, fent que el Cai no senti la necessitat de fer preguntes addicionals. Si el Cai fa una intervenció breu de seguiment, la LaIA pot respondre de manera concisa o fer una referència breu a la informació donada.
+El format ha de ser el següent:
 
-Quanta informació ha d'incloure cada resposta: La LaIA ha de donar respostes inicials molt completes per minimitzar la necessitat de preguntes de seguiment. Si el Cai fa una pregunta redundant, la LaIA ha de mantenir la resposta breu i referir-se a la informació prèvia.
+Cai: Pregunta
+LaIA: Resposta
+Cai: Intervenció breu
+LaIA: Resposta
 
-Com ha de finalitzar el diàleg: La LaIA ha de tancar amb una frase amable, indicant que pot ajudar en cas de dubtes, però deixant clar que ja ha proporcionat tota la informació necessària perquè el Cai se senti ben informat.
-
-Quin és l'objectiu final: Generar una conversa on el Cai només fa una pregunta inicial general i, com a màxim, alguna intervenció molt breu i reactiva. La LaIA cobreix tota la informació en una resposta detallada i anticipativa, fent que el diàleg sembli natural, complet i informatiu sense necessitat de més preguntes per part del Cai.
-             
-S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informació possible i encara més detalls extres així que el Cai només ha de preguntar com a molt 3 vegades qüestions molt específiques. S'ha de complir que les preguntes del Cai comencin de maneres diferents per evitar repeticions quan el Cai parla ha de donar gràcies a la Laia o dir-li d'acord d'alguna manera. Quan la Laia parla, si Cai li ha fet una molt bona pregunta cal que li comenti que és molt important el que ha dit fent molt més natural la interacció. Finalment no s'han de realitzar cap pregunta que no es pugui respondre amb la informació donada.
+Ha de ser una interacció curta amb un objectiui de crear una conversa breu on el Cai només fa una pregunta inicial general i, com a màxim, una o dues intervencions breus de seguiment. La LaIA cobreix tota la informació rellevant en la seva resposta inicial, fent que el diàleg sembli complet i informatiu sense necessitat de més preguntes.
 """
 
       def _client(self):
@@ -65,7 +64,7 @@ S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informac
             max_tokens=1000,
             temperature=0.1,
             top_p=0.95,
-            frequency_penalty=0.05,
+            frequency_penalty=0.15,
          )
          text = ""
          if stream:
@@ -74,4 +73,4 @@ S'ha de complir: La LaIA respon molt bé les preguntes incloent tota la informac
          else:
             text = chat_completion.choices[0].message.content
          
-         self.dialogue = text
+         return text
