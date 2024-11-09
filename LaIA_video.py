@@ -7,7 +7,7 @@ import aiohttp
 from dotenv import load_dotenv
 from pydub import AudioSegment
 from moviepy.editor import ImageClip, AudioFileClip, TextClip, CompositeVideoClip, concatenate_videoclips
-from textwrap import fill
+from textwrap import wrap
 from moviepy.video.fx.all import fadein, fadeout
 from openai import OpenAI
 import random
@@ -77,38 +77,34 @@ class LaIA_video:
         # Main async function to process all lines and generate audio files
         async def process_audio_files():
             ssl_context = ssl.create_default_context(cafile=certifi.where())
-            connector = aiohttp.TCPConnector(ssl=ssl_context)  # Set up connector with SSL context
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
 
             async with aiohttp.ClientSession(connector=connector) as session:
                 tasks = [generate_audio(session, speaker, text, i) for i, (speaker, text) in enumerate(self.lines)]
                 
-                # Gather all audio file names
                 audio_files = await asyncio.gather(*tasks)
-                audio_files = [file for file in audio_files if file is not None]  # Filter out None values
+                audio_files = [file for file in audio_files if file is not None]
 
-                # Concatenate all generated audio files
                 final_audio = AudioSegment.empty()
                 time_stamps = []
                 start_time = 0
 
                 for i, audio_file in enumerate(audio_files):
                     segment = AudioSegment.from_wav(audio_file)
-                    end_time = start_time + segment.duration_seconds / 1.15  # Adjust end time with speed-up factor
-                    time_stamps.append((start_time, end_time, self.lines[i][1]))  # Store adjusted timestamps
+                    end_time = start_time + segment.duration_seconds / 1.15
+                    time_stamps.append((start_time, end_time, self.lines[i][0], self.lines[i][1]))
                     start_time = end_time
                     final_audio += segment
 
-                # Speed up final audio by 1.15x
                 final_audio = final_audio.speedup(playback_speed=1.15)
                 
-                # Export final audio and delete intermediate files
                 final_audio.export("final_conversation.wav", format="wav")
                 for audio_file in audio_files:
                     os.remove(audio_file)
                 print("Final audio saved as 'final_conversation.wav'.")
             
             return time_stamps
-        
+                
         # Run the async process
         self.time_stamps = asyncio.run(process_audio_files())
 
@@ -177,10 +173,9 @@ class LaIA_video:
 
         # Function to detect the selected_category from the model output, the class are stored in categories variable
         def detect_selected_category(text, categories):
-            print(text)
             for category in categories:
-                print(category)
                 if category.lower() in text.lower():
+                    print(f"Selected category: {category}")
                     return category
             return random.choice(categories)
 
@@ -210,46 +205,52 @@ class LaIA_video:
                     new_f.write(f.read())
 
     def create_video(self):
-        # Now create the video with subtitles using the generated audio and images
         image_folder = "generated_images"
         audio_file = "final_conversation.wav"
         output_video = self.final_video_ubi
         image_duration = 10
 
-        # Load audio
         audio = AudioFileClip(audio_file)
         audio_duration = audio.duration
 
         self.generate_images()
 
-        # Get list of image files and check if there are any images
         image_files = sorted([os.path.join(image_folder, img) for img in os.listdir(image_folder) if img.endswith(".png") or img.endswith(".jpg")])
 
         if len(image_files) == 0:
             raise ValueError("No images found in the 'generated_images' folder.")
         
-        # Create video clips for each image and repeat them to cover the full audio duration
         image_clips = [ImageClip(image_files[i % len(image_files)]).set_duration(image_duration).resize(height=720) for i in range(0, int(audio_duration // image_duration) + 1)]
         background_video = concatenate_videoclips(image_clips, method="compose").set_duration(audio_duration)
 
-        # Create video clips with text for each segment in time_stamps
         text_clips = []
-        max_text_width = 40
+        max_text_width = 60
 
-        for start, end, text in self.time_stamps:
-            formatted_text = fill(text, width=max_text_width)
-            text_clip = TextClip(formatted_text, fontsize=24, color='white', font="Montserrat-Bold", bg_color='rgba(0, 0, 0, 0.5)', size=(background_video.w, None), method="caption")
-            text_clip = text_clip.set_duration(end - start).set_position(("center", "center")).set_start(start)
+        for start, end, speaker, text in self.time_stamps:
+            if speaker == 'Cai':
+                speaker = 'cAI'
+            # Add speaker name and wrap text with quotes
+            formatted_text = f'{speaker}: "{text.strip()}"'
+            wrapped_text = "\n".join(wrap(formatted_text, width=max_text_width))
+
+            num_lines = wrapped_text.count("\n") + 1
+            box_height = num_lines * 45
+
+            text_clip = (
+                TextClip(wrapped_text, fontsize=32, color='white', font="Arial-Bold", stroke_color="black", stroke_width=0.8)
+                .set_duration(end - start)
+                .set_position("center")
+                .on_color(size=(background_video.w - 50, box_height), color=(0, 0, 0), col_opacity=0.9)
+            )
+
+            text_clip = text_clip.set_position(("center", "center")).set_start(start)
             text_clips.append(text_clip)
 
-        # Combine background video and text clips
         final_video = CompositeVideoClip([background_video] + text_clips).set_audio(audio).set_fps(24)
 
-        # Delete all images from generated_images folder
         for file in os.listdir(image_folder):
             file_path = os.path.join(image_folder, file)
             if os.path.isfile(file_path):
                 os.unlink(file_path)
 
-        # Export final video
         final_video.write_videofile(output_video, codec="libx264", audio_codec="aac", temp_audiofile="temp-audio.m4a", remove_temp=True, verbose=False)
