@@ -38,9 +38,17 @@
 </head>
 <body class="gradient-bg min-h-screen text-gray-100">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
+
+        <div class="sidebar p-4">
+            <h2 class="text-xl font-bold mb-4">Documents</h2>
+            <div id="documentsList" class="space-y-2">
+                <!-- Documents will be inserted here -->
+            </div>
+        </div>
+
         <!-- Header -->
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold mb-2">AI Assistant</h1>
+            <h1 class="text-4xl font-bold mb-2">LaIA</h1>
             <p class="text-gray-400">Ask questions, upload documents, or search the web</p>
         </div>
 
@@ -86,12 +94,67 @@
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
         const fileInput = document.getElementById('fileInput');
+        const documentsList = document.getElementById('documentsList');
+
+        function getDocumentIcon(type) {
+            switch(type) {
+                case 'pdf':
+                    return '<i class="fas fa-file-pdf text-red-400"></i>';
+                case 'image':
+                    return '<i class="fas fa-image text-blue-400"></i>';
+                case 'web':
+                    return '<i class="fas fa-globe text-green-400"></i>';
+                default:
+                    return '<i class="fas fa-file text-gray-400"></i>';
+            }
+        }
+
+        function updateDocumentsList(documents) {
+            documentsList.innerHTML = documents.map(doc => `
+                <div class="document-item flex items-start" data-id="${doc.id}">
+                    <div class="document-icon">
+                        ${getDocumentIcon(doc.type)}
+                    </div>
+                    <div class="flex-1">
+                        <div class="document-title">${doc.title}</div>
+                        <div class="document-meta">
+                            ${new Date(doc.timestamp).toLocaleDateString()}
+                        </div>
+                        ${doc.source_url ? `
+                            <a href="${doc.source_url}" 
+                               class="text-blue-400 hover:text-blue-300 text-sm block truncate" 
+                               target="_blank">${doc.source_url}</a>
+                        ` : ''}
+                    </div>
+                    <button class="delete-document p-1 opacity-0 hover:opacity-100 text-red-400"
+                            onclick="removeDocument('${doc.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
 
         function createMessageElement(message) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `p-4 rounded-lg ${message.role}-message`;
             
             let content = `<p class="mb-2">${message.content}</p>`;
+            
+            if (message.citations) {
+                content += `<div class="citations mt-4 space-y-2">
+                    ${message.citations.map(citation => `
+                        <div class="citation">
+                            <div class="font-semibold">[${citation.number}] ${citation.doc_title}</div>
+                            <div class="text-sm">${citation.content}</div>
+                            ${citation.source_url ? `
+                                <a href="${citation.source_url}" 
+                                   class="text-blue-400 hover:text-blue-300 text-sm"
+                                   target="_blank">Source</a>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>`;
+            }
             
             if (message.audio_file) {
                 content += `
@@ -106,6 +169,41 @@
             
             messageDiv.innerHTML = content;
             return messageDiv;
+        }
+
+        async function removeDocument(docId) {
+            try {
+                const response = await fetch(`/documents/${docId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    updateDocumentsList(data.documents);
+                }
+            } catch (error) {
+                console.error('Error removing document:', error);
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                updateDocumentsList(data.documents);
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
         }
 
         function updateChat(messages) {
@@ -152,6 +250,7 @@
                 if (data.history) {
                     updateChat(data.history);
                 }
+                loadDocuments();
             } catch (error) {
                 console.error('Error sending message:', error);
             } finally {
@@ -205,6 +304,7 @@
             } catch (error) {
                 console.error('Error uploading file:', error);
             }
+            loadDocuments();
         }
 
         function addMessageToChat(message) {
@@ -213,9 +313,12 @@
         }
 
         const socket = io('/chat', { query: { session_id: sessionId } }); // Use namespace and query
-
+        loadDocuments();
         socket.on('chat_update', (data) => {
             updateChat(data.history);
+            if (data.documents) {
+                updateDocumentsList(data.documents);
+            }
         });
 
 

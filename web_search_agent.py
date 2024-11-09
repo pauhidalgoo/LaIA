@@ -11,7 +11,7 @@ import concurrent.futures
 import logging
 import json
 import re
-
+from select_best_sources import SelectBestSources
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,14 +47,14 @@ class WebSearchAgent:
         """
         try:
             # Initial Google search
-            print("Searching " + query + " ...")
+            # print("Searching " + query + " ...")
             search_results = list(search(query + " site:gencat.cat/ca", num_results=2))
             
             if not search_results:
                 print("No search results found for the query in Gencat, searching in the whole web.")
                 search_results = list(search(query, num_results=2))
                 if not search_results:
-                    return "No search results found anywhere."
+                    return False
             
             # Collect information from multiple sources
             gathered_info = []
@@ -190,20 +190,10 @@ class WebSearchAgent:
         Returns:
             str: Synthesized response
         """
-        # Prepare context for the LLM
-        context = f"Query: {query}\n\nGathered Information:\n"
-        for info in gathered_info:
-            context += f"\nSource: {info['url']}\n"
-            context += f"Content: {info['main_content'][:500]}...\n"  # Truncate for token limit
         
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sources to provide accurate and comprehensive answers."},
-            {"role": "user", "content": f"Based on the following information, provide a list of the sources that satisfy the query. Provide all the URLs needed (between the text).{context}"}
-        ]
         data_to_save = {
             "query": query,
             "gathered_info": gathered_info,
-            "messages": messages
         }
 
         # Define the file path
@@ -213,32 +203,8 @@ class WebSearchAgent:
         # Save the dictionary as a JSON file
         with open(file_path, 'w') as json_file:
             json.dump(data_to_save, json_file, indent=4)
+        return file_path
 
-        print(f"Data saved to {file_path}")
-
-        try:
-            response = self.client.chat.completions.create(
-                model="tgi",
-                messages=messages,
-                temperature=0.3,
-                max_tokens=1000
-            )
-            
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            logger.error(f"Error in synthesis: {str(e)}")
-            return "Error synthesizing information from sources."
-    def check_urls(self, url_list):
-        valid_urls = []
-        for url in url_list:
-            try:
-                response = requests.head(url, timeout=5)
-                if response.status_code == 200:
-                    valid_urls.append(url)
-            except requests.RequestException as e:
-                print(f"URL {url} is not accessible. Error: {e}")
-        return valid_urls
 
     def generate_rag_response(self, question: str, context: str) -> str:
         """
@@ -309,27 +275,29 @@ class WebSearchAgent:
 def main():
     load_dotenv(".env")
     
+    base_url = os.environ["BASE_URL"]
+    api_key = os.environ["HF_TOKEN"]
     # Initialize the agent
     agent = WebSearchAgent(
-        base_url=os.environ["BASE_URL"],
-        api_key=os.environ["HF_TOKEN"],
-        max_depth=3,
-        max_links_per_page=5
+        base_url=base_url,
+        api_key=api_key,
+        max_depth=2,
+        max_links_per_page=3
     )
     
     # Example query
-    query = input("Enter your search query: ")
+    old_query = input("Enter your search query: ")
     
-    query = agent.process_prompt(query)
+    query = agent.process_prompt(old_query)
     query = query.split("\n")
     responses = []
-    for q in query:
+
+    select_best_sources = SelectBestSources(base_url=base_url, api_key=api_key, max_source_chars_length=500, max_simultaneous_sources=5, remove_parent_urls=True)
+    for q in query[:3]:
     # Get response
         response = agent.search_and_analyze(q)
-        print("\nResponse:", response)
-        responses.extend(re.findall(r"https?://[^\s]+", response))
-    print(responses)
-    responses = agent.check_urls(responses)
+        select_best_sources.append_sources(response)
+    responses = select_best_sources.get_final_sources(old_query)
     print(responses)
     
 
