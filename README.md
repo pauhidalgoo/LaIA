@@ -111,7 +111,11 @@ In the hackathon, we were provided with Huggingface inference endpoints (and tho
 ## Examples
 Here are some examples of LaIA interactions, as well as a video.
 
-[![Mira el video](./images/presentation.png)](https://github.com/pauhidalgoo/LaIA/raw/refs/heads/main/final_video_with_subtitles.mp4)
+
+https://github.com/user-attachments/assets/59578c44-70ab-4f8f-9ea2-8666ce02550e
+
+
+
 
 <p align="center">
   <img width="600" height="300" src="./images/example.png">
