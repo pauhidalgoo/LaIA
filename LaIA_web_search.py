@@ -11,7 +11,7 @@ import concurrent.futures
 import logging
 import json
 import re
-from select_best_sources import SelectBestSources
+from LaIA_select_best_sources import SelectBestSources
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
