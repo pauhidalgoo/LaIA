@@ -28,7 +28,7 @@ class WebSearchAgent:
             max_links_per_page: Maximum number of links to explore per page
         """
         self.client = OpenAI(
-            base_url=base_url + "/v1/",
+            #base_url=base_url + "/v1/",
             api_key=api_key
         )
         self.max_depth = max_depth
@@ -48,7 +48,7 @@ class WebSearchAgent:
         try:
             # Initial Google search
             # print("Searching " + query + " ...")
-            search_results = list(search(query + " site:gencat.cat/ca", num_results=2))
+            search_results = list(search(query , num_results=2)) # +  " site:gencat.cat/ca"
             
             if not search_results:
                 print("No search results found for the query in Gencat, searching in the whole web.")
@@ -238,7 +238,7 @@ class WebSearchAgent:
             ]
 
             response = self.client.chat.completions.create(
-                model="tgi",  # Or your preferred model
+                model="gpt-4o-mini",  # Or your preferred model
                 messages=messages,
                 temperature=0.3,
                 max_tokens=1000
@@ -271,7 +271,7 @@ class WebSearchAgent:
 
         try:
             response = self.client.chat.completions.create(
-                model="tgi",
+                model="gpt-4o-mini",
                 messages=messages,
                 temperature=0.3,
                 max_tokens=1000
@@ -290,7 +290,7 @@ def main():
     load_dotenv(".env")
     
     base_url = os.environ["BASE_URL"]
-    api_key = os.environ["HF_TOKEN"]
+    api_key = os.environ["OPENAI_TOKEN"]
     # Initialize the agent
     agent = WebSearchAgent(
         base_url=base_url,

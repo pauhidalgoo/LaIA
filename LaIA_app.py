@@ -44,13 +44,13 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 agent = WebSearchAgent(
     base_url=os.environ["BASE_URL"],
-    api_key=os.environ["HF_TOKEN"],
+    api_key=os.environ["OPENAI_TOKEN"], # HF_TOKEN
     max_depth=1,
     max_links_per_page=1
 )
 API_URL = os.environ["API_URL"]
 TTS_HEADERS = {
-    "Authorization": f"Bearer {os.environ['HF_TOKEN']}",
+    "Authorization": f"Bearer {os.environ['OPENAI_TOKEN']}",
 }
 
 class ChatSession:
@@ -236,11 +236,13 @@ def chat():
 
             response = output['response']
             citations = output['citations']
+            print("response", response)
 
             if response == 'No relevant context found to answer the question.':
+                
                 query = agent.process_prompt(message)
                 base_url = os.environ["BASE_URL"]
-                api_key = os.environ["HF_TOKEN"]
+                api_key = os.environ["OPENAI_TOKEN"] # HF_TOKEN
                 select_best_sources = SelectBestSources(base_url=base_url, api_key=api_key, max_source_chars_length=500, max_simultaneous_sources=5, remove_parent_urls=False)
                 query = query.split("\n")
                 for q in query[:3]:
@@ -269,7 +271,7 @@ def chat():
 
             query = agent.process_prompt(message)
             base_url = os.environ["BASE_URL"]
-            api_key = os.environ["HF_TOKEN"]
+            api_key = os.environ["OPENAI_TOKEN"] # HF_TOKEN
             select_best_sources = SelectBestSources(base_url=base_url, api_key=api_key, max_source_chars_length=500, max_simultaneous_sources=5, remove_parent_urls=False)
             query = query.split("\n")
             for q in query[:3]:

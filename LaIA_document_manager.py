@@ -110,7 +110,7 @@ class DocumentManager:
             for doc, score in results
         ]
         print(formatted_results)
-        formatted_results = [d for d in formatted_results if d['relevance_score'] <= relevance_threshold]
+        formatted_results = [d for d in formatted_results]
             
         return formatted_results
     
@@ -172,20 +172,21 @@ class DocumentManager:
         
         messages = [
             {"role": "system", "content": """You are a helpful assistant that answers questions based on the provided context. 
-             Include citation numbers [1], [2], etc. when referencing specific information from the context. If you don't find information, return NOT_FOUND."""},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+             Include citation numbers [1], [2], etc. when referencing specific information from the context."""},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query} If the context is unrelated, return NOT_FOUND."}
         ]
 
         
         
         response = llm_client.chat.completions.create(
-            model="tgi",
+            model="gpt-4o-mini", # Old was tgi
             max_tokens=1000,
             messages=messages,
             temperature=0.3
         )
         
         answer = response.choices[0].message.content
+
         if "NOT_FOUND" in answer or "no he trobat" in answer.lower():
             print(response.choices[0].message.content)
             return {

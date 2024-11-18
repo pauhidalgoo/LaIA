@@ -10,6 +10,7 @@ class LaIA_dialogue:
          load_dotenv(".env")
          self.messages = messages
          self.HF_TOKEN = os.environ["HF_TOKEN"]
+         self.OPENAI_TOKEN = os.environ["OPENAI_TOKEN"]
          self.BASE_URL = os.environ["BASE_URL"]
          self._client()
 
@@ -42,8 +43,9 @@ Ha de ser una interacció curta amb un objectiui de crear una conversa breu on e
          Create an OpenAI client
          """
          self.client = OpenAI(
-               base_url=self.BASE_URL + "/v1/",
-               api_key=self.HF_TOKEN
+               #base_url=self.BASE_URL + "/v1/",
+               #api_key=self.HF_TOKEN
+               api_key=self.OPENAI_TOKEN
              )
          
       def create_dialogue(self):
@@ -58,7 +60,7 @@ Ha de ser una interacció curta amb un objectiui de crear una conversa breu on e
          self.messages.append( {"role":"user", "content": f'{self.text}'})
          stream = False
          chat_completion = self.client.chat.completions.create(
-            model="tgi",
+            model="gpt-4o-mini", # Old was tgi
             messages=self.messages,
             stream=stream,
             max_tokens=1000,

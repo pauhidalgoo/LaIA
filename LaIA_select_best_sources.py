@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class SelectBestSources:
 	def __init__(self, base_url: str, api_key: str, max_source_chars_length: int = 500, max_simultaneous_sources: int = 5, remove_parent_urls: bool = False) -> None:
 		self.client = OpenAI(
-			base_url=base_url + "/v1/",
+			#base_url=base_url + "/v1/",
 			api_key=api_key
 		)
 		self.max_source_chars_length = max_source_chars_length
@@ -67,13 +67,13 @@ class SelectBestSources:
 			context += f"Content: {info[1][:self.max_source_chars_length]}...\n"
 		
 		messages = [
-			{"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sources to provide accurate and comprehensive answers. You will be given a query and a list of sources with their main content. Your goal is to provide a list of the sources that contain the information needed to answer the query."},
+			{"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sources to provide accurate and comprehensive answers. You will be given a query and a list of sources with their main content. Your goal is to provide a list of the sources that contain the information needed to answer the query. Always return all the URLs needed."},
 			{"role": "user", "content": f"Based on the following information, provide a list of the sources that most satisfy the query. Provide all the URLs needed (between the text).{context}"}
 		]
 
 		try:
 			response = self.client.chat.completions.create(
-				model="tgi",
+				model="gpt-4o-mini", # Old was tgi
 				messages=messages,
 				temperature=0.1,
 				max_tokens=1000,
@@ -82,7 +82,7 @@ class SelectBestSources:
 
 			answer = response.choices[0].message.content
 
-			selected_urls = re.findall(r"https?://[^\s]+", answer)
+			selected_urls = re.findall(r"https?://[^\s,)}\]]+", answer)
 
 			selected_urls = [re.sub(r"[,)}\]]+$", "", url) for url in selected_urls]
 			
@@ -98,7 +98,7 @@ class SelectBestSources:
 
 			if self.remove_parent_urls:
 				valid_urls_and_contents = self.__remove_parent_urls_from_set(valid_urls_and_contents)
-			
+
 			return valid_urls_and_contents
 			
 		except Exception as e:
